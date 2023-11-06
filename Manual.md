@@ -18,11 +18,7 @@ Para ejecutar la aplicación, sigue estos pasos:
 2. Navega hasta el directorio donde se encuentra el código fuente de la aplicación.
 3. Ejecuta el archivo Python con el siguiente comando:
 
-   ```
   python file_naming_app.py
-   ```
-
-   Asegúrate de reemplazar `nombre_del_archivo.py` con el nombre real del archivo de código fuente.
 
 ## Interfaz de Usuario
 
