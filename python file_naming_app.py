@@ -14,7 +14,7 @@ def set_base_directory():
     if base_directory:
         base_directory_label.config(text=f"Directorio base seleccionado: {base_directory}")
     else:
-        messagebox.showwarning("Directorio Base", "No seleccionaste un directorio base.")
+        messagebox.showwarning("Directorio Raiz", "No seleccionaste un directorio base.")
 
 def add_categories():
     global user_categories, base_directory
