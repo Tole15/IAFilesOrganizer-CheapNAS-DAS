@@ -1,75 +1,305 @@
-# Manual de Uso de la Aplicación de Nomenclatura de Archivos
+# MANUAL de Uso — Smart Storage Organizer AI (API)
+**Proyecto:** `IAFilesOrganizer-CheapNAS-DAS`
 
-Este manual proporciona una guía detallada para utilizar la "Aplicación de Nomenclatura de Archivos", una herramienta desarrollada en Python utilizando la biblioteca tkinter. Esta aplicación te permite organizar y renombrar archivos de acuerdo con categorías personalizadas que definas.
+Este manual explica cómo usar el proyecto **IAFilesOrganizer-CheapNAS-DAS** en su versión actual (backend con **FastAPI**).  
+El objetivo del sistema es:
 
-## Requisitos Previos
+1. Escanear un directorio (`POST /scan`) y guardar metadatos de archivos en una base local.
+2. Extraer texto de archivos compatibles (`POST /extract`) para que la IA pueda **ver** su contenido.
+3. (Opcional) Generar embeddings (`POST /embed`) para búsqueda semántica / RAG.
+4. Pedirle a un LLM un **plan de organización** (`POST /plan`) que sugiera mover/renombrar con criterio.
+5. Aplicar el plan (`POST /apply`) en modo **dry-run** o real.
 
-Antes de utilizar la aplicación, asegúrate de tener instalado Python en tu sistema. Puedes descargarlo desde [el sitio web oficial de Python](https://www.python.org/downloads/).
+> Importante: el proyecto **no borra archivos automáticamente**. Primero genera un plan y tú decides si lo aplicas.
 
-## Instalación
+---
 
-No es necesario instalar nada adicional para utilizar esta aplicación. Simplemente descarga el código fuente y ejecuta el archivo Python.
+## 1) Requisitos
 
-## Ejecución de la Aplicación
+- Windows 10/11 (o Linux/Mac con pequeños cambios)
+- Python 3.11+ recomendado
+- Git
+- (Opcional) API key de OpenAI si usarás `/embed` y/o `/plan` con LLM
+- Disco con datos (HDD/SSD/NAS/DAS). Para pruebas, usa una carpeta con copias.
 
-Para ejecutar la aplicación, sigue estos pasos:
+---
 
-1. Abre una terminal o línea de comandos en tu sistema.
-2. Navega hasta el directorio donde se encuentra el código fuente de la aplicación.
-3. Ejecuta el archivo Python con el siguiente comando:
+## 2) Estructura del proyecto
 
-  python file_naming_app.py
+- `apps/`: API FastAPI (endpoints, schemas, rutas).
+- `packages/`: lógica del core  
+  - `packages/scanner/`: escaneo, hashing y marcado de archivos generados (basura típica)
+  - `packages/extractors/`: extracción de texto (PDF/otros)
+  - `packages/intelligence/`: embeddings, planner (LLM), búsqueda
+- `data/`: base local (SQLite) y datos internos.
 
-## Interfaz de Usuario
+> Nota: `.env`, `.venv/` y `data/` **no** deberían versionarse en Git.
 
-La aplicación presenta una interfaz de usuario simple y fácil de usar con las siguientes características:
+---
 
-### Paso 1: Seleccionar Directorio Base
+## 3) Instalación (modo local)
 
-- Haz clic en el botón "Seleccionar Directorio Base" para elegir la carpeta base donde se crearán las categorías y se organizarán los archivos.
+### 3.1) Crear y activar venv
 
-### Paso 2: Configurar las Categorías Iniciales
+En PowerShell, en la raíz del repo:
 
-- Haz clic en el botón "Añadir Categoría" para agregar nuevas categorías.
-- Utiliza el botón "Borrar Categoría" para eliminar categorías existentes, opcionalmente también se pueden eliminar las carpetas correspondientes en el sistema de archivos.
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
 
-### Paso 3: Seleccionar Archivos y Renombrar
+### 3.2) Instalar dependencias
 
-- Haz clic en "Seleccionar Archivos y Renombrar" para seleccionar archivos y aplicarles un nuevo nombre basado en las categorías y subcarpetas.
-- Puedes agregar un prefijo adicional opcional durante la selección y renombrado de archivos.
+```powershell
+pip install -r requirements.txt
+```
 
-### Respaldar Categorías
+---
 
-- Utiliza el botón "Respaldar Categorías" para crear un archivo de respaldo en formato ZIP de todas las categorías y sus archivos.
+## 4) Variables de entorno (OpenAI)
 
-### Restaurar desde Respaldo
+Crea un archivo `.env` en la raíz (NO se sube a Git):
 
-- Con el botón "Restaurar desde Respaldo", puedes seleccionar un archivo de respaldo ZIP previamente creado y restaurar todas las categorías y sus archivos.
+```bash
+OPENAI_API_KEY=tu_api_key_aqui
+```
 
-## Uso de la Aplicación
+Verifica que se cargó:
 
-A continuación, se describe el proceso típico de uso de la aplicación:
+```powershell
+python -c "import os; from dotenv import load_dotenv; load_dotenv(); print('KEY=', bool(os.getenv('OPENAI_API_KEY')))"
+```
 
-1. Selecciona un "Directorio Base" donde se crearán las categorías y se organizarán los archivos.
+Si sale `KEY= True`, ya quedó.
 
-2. Configura las "Categorías Iniciales" que se utilizarán para clasificar los archivos. Puedes agregar y eliminar categorías según sea necesario.
+---
 
-3. Selecciona archivos haciendo clic en "Seleccionar Archivos y Renombrar". La aplicación te pedirá que ingreses la categoría a la que pertenecen estos archivos y opcionalmente un prefijo adicional.
+## 5) Levantar la API
 
-4. La aplicación renombrará y moverá los archivos a las carpetas correspondientes en función de la categoría seleccionada.
+### 5.1) Opción recomendada (estable, sin reinicios)
 
-5. Si deseas hacer una copia de seguridad de tus categorías y archivos, puedes utilizar la función "Respaldar Categorías".
+```powershell
+python -m uvicorn apps.api.main:app --port 8000
+```
 
-6. Si alguna vez necesitas restaurar tus categorías y archivos desde un respaldo, utiliza la función "Restaurar desde Respaldo".
+### 5.2) Opción dev (con reload)
 
-## Solución de Problemas
+Úsala solo si no estás tocando scripts sueltos que disparen reload:
 
-Si encuentras algún problema al utilizar la aplicación, asegúrate de lo siguiente:
+```powershell
+python -m uvicorn apps.api.main:app --reload --port 8000
+```
 
-- Has seleccionado un "Directorio Base" válido antes de intentar seleccionar archivos.
-- Las categorías que intentas utilizar existen en la lista de "Categorías Iniciales".
-- Los nombres de archivo no contienen caracteres no permitidos o duplicados en el mismo directorio.
+Swagger:
+- http://127.0.0.1:8000/docs
 
-## Conclusión
+---
 
-La "Aplicación de Nomenclatura de Archivos" es una herramienta útil para organizar y renombrar archivos de manera eficiente. Con una interfaz de usuario sencilla, te permite gestionar categorías y mantener tus archivos organizados. ¡Disfruta de la organización y la gestión de tus archivos de una manera más eficiente!
+## 6) Conceptos: `root_path`, jobs y estados
+
+### 6.1) `root_path`
+
+Es la carpeta raíz que quieres procesar. Ejemplos:
+
+- `C:\Users\...\docs`
+- `C:\Users\...\fpga`
+- `D:\NAS\clientes\proyecto_01`
+
+**Regla:** En JSON debes escribir backslashes escapadas (`\\`).
+
+### 6.2) Jobs
+
+Cada operación pesada se lanza como un job:
+
+- `queued`: en cola
+- `running`: en proceso
+- `done`: terminó bien
+- `failed`: falló (ver campo `error`)
+
+Ver job:
+- `GET /jobs/{job_id}`
+
+---
+
+## 7) Pipeline recomendado (paso a paso)
+
+Para un directorio `root_path`, este es el flujo típico.
+
+### Paso 1 — Scan
+
+**Endpoint:** `POST /scan`
+
+Body ejemplo:
+
+```json
+{
+  "root_path": "C:\\Users\\Tole Mendoza\\OneDrive\\Documentos\\sumobot-embedded-system-competition2\\sumobot-embedded-system-competition\\fpga",
+  "mode": "incremental"
+}
+```
+
+Respuesta típica:
+
+```json
+{ "job_id": 123, "status": "queued" }
+```
+
+Luego:
+- `GET /jobs/123` hasta que cambie a `done`.
+
+**Resultado:** se registran archivos en DB con metadatos + marca `is_generated` para archivos basura (isim/work/build/etc).
+
+---
+
+### Paso 2 — Extract
+
+**Endpoint:** `POST /extract`
+
+Body ejemplo:
+
+```json
+{
+  "root_path": "C:\\Users\\...\\fpga",
+  "limit": 500,
+  "force": true
+}
+```
+
+- `force=true` reintenta extracción aunque ya existiera.
+- Se recomienda procesar solo archivos `active` y **no generados**.
+
+Luego:
+- `GET /jobs/{job_id}` hasta `done`.
+
+**Resultado:**
+- `content_status=ok` y `content_text` para PDFs/archivos soportados
+- `unsupported` para imágenes/binarios, etc.
+
+---
+
+### Paso 3 — Embed (opcional)
+
+**Endpoint:** `POST /embed`
+
+Body ejemplo:
+
+```json
+{
+  "root_path": "C:\\Users\\...\\fpga",
+  "limit": 200
+}
+```
+
+Luego:
+- `GET /jobs/{job_id}` hasta `done`.
+
+**Resultado:**
+- `embedding_status=ok` si hay texto
+- Si falla: revisa key, cuota y logs.
+
+---
+
+### Paso 4 — Plan
+
+**Endpoint:** `POST /plan`
+
+Body ejemplo:
+
+```json
+{
+  "root_path": "C:\\Users\\...\\fpga",
+  "policy": "default",
+  "limit": 200
+}
+```
+
+Luego:
+- `GET /jobs/{job_id}` hasta `done`.
+- En `stats_json` verás `plan_id`.
+
+**Resultado:** se guarda un JSON con acciones (`move`, `mkdir`), con `confidence` y `rationale`.
+
+Recomendación (tu criterio):
+- limitar profundidad (pocas carpetas)
+- evitar forzar siempre una categoría como `embedded_system`
+- usar fallbacks por `ext`/`mimetype` cuando no hay texto
+
+---
+
+### Paso 5 — Apply
+
+**Endpoint:** `POST /apply`
+
+Primero **dry-run**:
+
+```json
+{
+  "plan_id": 3,
+  "dry_run": true
+}
+```
+
+Si se ve bien:
+
+```json
+{
+  "plan_id": 3,
+  "dry_run": false
+}
+```
+
+**Resultado:** se crean carpetas y se mueven/renombran archivos.  
+Si existe `op_journal`, se guarda el historial de operaciones.
+
+---
+
+## 8) Consultas útiles
+
+- Ver archivos: `GET /files?root_path=...&limit=50&offset=0`
+- Ver archivo: `GET /files/{file_id}`
+- Ver job: `GET /jobs/{job_id}`
+
+---
+
+## 9) Buenas prácticas y seguridad
+
+1. Prueba con una carpeta de copia primero.
+2. Ejecuta `/apply` con `dry_run=true` antes de mover realmente.
+3. Mantén `.env` fuera de Git.
+4. Si expones la API con Cloudflare Tunnel:
+   - añade autenticación (Cloudflare Access / JWT / Basic Auth)
+   - restringe acceso según necesidad (IP/país)
+   - considera modo solo lectura (sin apply) para entornos públicos
+
+---
+
+## 10) Troubleshooting rápido
+
+### 10.1) Swagger da 422 “JSON invalid”
+En Windows debes escapar backslashes. Ejemplo correcto:
+
+```json
+{ "root_path": "C:\\Users\\Tu\\Ruta" }
+```
+
+### 10.2) `/plan` se queda queued o falla
+Revisa:
+- `GET /jobs/{id}`
+- logs de uvicorn
+
+Si usas `--reload` y estás editando scripts sueltos, puede reiniciar procesos.  
+Solución: reinicia uvicorn **sin** `--reload`.
+
+### 10.3) Embeddings fallan por cuota o key
+- `429 insufficient_quota`: no hay cuota/saldo
+- `401 invalid_api_key`: key inválida o mal cargada
+
+---
+
+## 11) Roadmap sugerido
+
+- Clasificación automática de archivos generados con `is_generated` desde `scan`
+- Exclusión automática en `extract/embed/plan` (sin obligar al usuario a configurar globs)
+- Planner con límite de profundidad (1 categoría + 0–2 subfolders)
+- Políticas por carpeta (ej. catecismo vs fpga vs clientes)
+- Cloudflare Tunnel + Auth + DNS estable
